@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Mestre do Jogo - Sprint 2</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <header>
+            <h1>🤖 Mestre do Jogo</h1>
+            <div style="display: flex; gap: 5px; justify-content: center; margin-top: 5px;">
+                <button onclick="limparMemoria()" style="background: #ff4d4d; color: white; border: none; padding: 5px; border-radius: 5px; cursor: pointer;">🗑️ Limpar</button>
+                <button onclick="verRanking()" style="background: #f1c40f; color: black; border: none; padding: 5px; border-radius: 5px; cursor: pointer;">🏆 Ver Ranking</button>
+            </div>
+        </header>
+
+        <!-- Campo de Identificação -->
+        <div id="setup-user" style="padding: 10px; background: #eee; text-align: center;">
+            <input type="text" id="nickname" placeholder="Seu Nickname..." style="width: 70%; padding: 8px;">
+        </div>
+
+        <div class="chat-window" id="chat-window">
+            <div class="message ai">Diga seu nickname acima e me dê um "Oi" para começarmos o desafio!</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Sua resposta...">
+            <button id="send-btn" onclick="enviarMensagem()">Enviar</button>
+        </div>
+    </div>
+
+    <!-- Modal Simples de Ranking -->
+    <div id="ranking-modal" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #333; z-index: 1000; border-radius: 10px; width: 300px;">
+        <h2 style="text-align: center;">🏆 Top 10</h2>
+        <div id="ranking-lista"></div>
+        <button onclick="document.getElementById('ranking-modal').style.display='none'" style="width: 100%; margin-top: 10px;">Fechar</button>
+    </div>
+
+    <script>
+        async function enviarMensagem() {
+            const nickInput = document.getElementById("nickname");
+            const input = document.getElementById("user-input");
+            const chatWindow = document.getElementById("chat-window");
+
+            const nickname = nickInput.value.trim();
+            const texto = input.value.trim();
+
+            if (!nickname) { alert("Digite um nickname primeiro!"); return; }
+            if (!texto) return;
+
+            // Bloqueia o campo de nickname após começar
+            nickInput.disabled = true;
+
+            chatWindow.innerHTML += `<div class="message user"><b>${nickname}:</b> ${texto}</div>`;
+            input.value = "";
+
+            const loadingId = "load-" + Date.now();
+            chatWindow.innerHTML += `<div class="message ai" id="${loadingId}">Analisando sua resposta...</div>`;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pergunta: texto, nickname: nickname }) // Enviando nick
+                });
+
+                const data = await response.json();
+                document.getElementById(loadingId).innerHTML = marked.parse(data.resposta || data.erro);
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Erro no servidor.";
+            }
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        async function verRanking() {
+            try {
+                const response = await fetch('/api/chat/ranking');
+                const jogadores = await response.json();
+                let html = "<ol>";
+                jogadores.forEach((j, i) => {
+                    const medalha = i === 0 ? "🥇" : "";
+                    html += `<li>${medalha} <b>${j.nome}</b> - ${j.xp} XP</li>`;
+                });
+                html += "</ol>";
+                document.getElementById("ranking-lista").innerHTML = html;
+                document.getElementById("ranking-modal").style.display = "block";
+            } catch (err) { alert("Erro ao carregar ranking."); }
+        }
+
+        async function limparMemoria() {
+            await fetch('/api/chat/limpar', { method: 'DELETE' });
+            location.reload();
+        }
+    </script>
+</body>
+</html>
